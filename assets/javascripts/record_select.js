@@ -1,17 +1,4 @@
-document.observe("dom:loaded", function() {
-  RecordSelect.document_loaded = true;
-  document.on('ajax:before', 'div.record-select * li a', function(event) {
-    var link = event.findElement();
-    if (link) {
-      if (RecordSelect.notify(link) == false) {
-        event.stop();
-      } else {
-        link.toggleClassName("selected");
-      }
-    }
-    return true;
-  });  
-});    
+Event.observe(window, 'load', function() {RecordSelect.document_loaded = true});
 
 Form.Element.AfterActivity = function(element, callback, delay) {
   element = $(element);
@@ -28,14 +15,14 @@ Form.Element.AfterActivity = function(element, callback, delay) {
 var RecordSelect = new Object();
 RecordSelect.document_loaded = false;
 
-RecordSelect.notify = function(item) {
+RecordSelect.notify = function(item, options) {
   var e = Element.up(item, '.record-select-handler');
   var onselect = e.onselect || e.getAttribute('onselect');
   if (typeof onselect != 'function') onselect = eval(onselect);
   if (onselect)
   {
     try {
-      onselect(item.parentNode.id.substr(2), (item.down('label') || item).innerHTML.unescapeHTML(), e);
+      onselect(options, (item.down('label') || item).innerHTML.unescapeHTML(), e);
     } catch(e) {
       alert(e);
     }
@@ -71,8 +58,8 @@ Object.extend(RecordSelect.Abstract.prototype, {
    * the onselect event handler - when someone clicks on a record
    * --override--
    */
-  onselect: function(id, value) {
-    alert(id + ': ' + value);
+  onselect: function(options, value) {
+    alert('options: ' + options + '\nvalue: ' + value);
   },
 
   /**
@@ -251,8 +238,8 @@ RecordSelect.Dialog.prototype = Object.extend(new RecordSelect.Abstract(), {
     if (this.onkeypress) this.obj.observe('keypress', this.onkeypress.bind(this));
   },
 
-  onselect: function(id, value) {
-    if (this.options.onselect(id, value) != false) this.close();
+  onselect: function(options, value) {
+    if (this.options.onselect(options, value) != false) this.close();
   },
 
   toggle: function() {
@@ -273,16 +260,16 @@ RecordSelect.Single.prototype = Object.extend(new RecordSelect.Abstract(), {
     this.container = this.create_container();
     this.container.addClassName('record-select-autocomplete');
 
-    // create the hidden input
-    new Insertion.After(this.obj, '<input type="hidden" name="" value="" />')
-    this.hidden_input = this.obj.next();
-
-    // transfer the input name from the text input to the hidden input
-    this.hidden_input.name = this.obj.name;
+    this.hidden_inputs = new Hash();
+    this.hidden_inputs_base_name = this.obj.name;
     this.obj.name = '';
 
     // initialize the values
-    this.set(this.options.id, this.options.label);
+    var initial_options = null
+    if ('attributes' in this.options) {
+      initial_options = this.options.attributes
+    }
+    this.set(initial_options, this.options.label);
 
     this._respond_to_text_field(this.obj);
     if (this.obj.focused) this.open(); // if it was focused before we could attach observers
@@ -290,23 +277,60 @@ RecordSelect.Single.prototype = Object.extend(new RecordSelect.Abstract(), {
 
   close: function() {
     // if they close the dialog with the text field empty, then delete the id value
-    if (this.obj.value == '') this.set('', '');
+    if (this.obj.value == '') {
+      this.set(null, '');
+    }
 
     RecordSelect.Abstract.prototype.close.call(this);
   },
 
-  onselect: function(id, value) {
-    if (this.options.onchange) this.options.onchange(id, value);
-    this.set(id, value);
+  onselect: function(options, value) {
+    if (this.options.onchange) this.options.onchange(options, value);
+    this.set(options, value);
     this.close();
   },
 
   /**
    * sets the id/label
    */
-  set: function(id, label) {
+  set: function(options, label) {
     this.obj.value = label.unescapeHTML();
-    this.hidden_input.value = id;
+    // Capture hash without this as this will be different in iterator for each.
+    var hidden_inputs = this.hidden_inputs
+    
+    if (options == null) {
+      hidden_inputs.each(function(pair) {
+        // delete all hidden inputs so nothing submits
+        hidden_inputs.get(pair.key).remove()
+      });
+    }
+    else {
+      options = $H(options)
+      var option_keys = options.keys()
+      var hidden_input_keys = hidden_inputs.keys()
+      
+      // delete hidden inputs that aren't in these options
+      var removed_keys = hidden_input_keys.without(option_keys)
+      removed_keys.each(function(key) {
+        hidden_inputs.get(key).remove()
+      })
+      
+      // create hidden inputs that don't exist yet but are in option
+      var new_keys = option_keys.without(hidden_input_keys)
+      var base_name = this.hidden_inputs_base_name;
+      var base_object = this.obj
+      new_keys.each(function(key) {
+        new Insertion.After(base_object, 
+                            '<input type="hidden" name="' + base_name +
+                            '[' + key + ']' + '" />');
+        inserted_object = base_object.next();
+        hidden_inputs.set(key, inserted_object);
+      })
+      
+      options.each(function(pair) {
+        hidden_inputs.get(pair.key).value = pair.value;
+      });
+    }
   }
 });
 
@@ -340,15 +364,15 @@ RecordSelect.Multiple.prototype = Object.extend(new RecordSelect.Abstract(), {
     if (this.obj.focused) this.open(); // if it was focused before we could attach observers
   },
 
-  onselect: function(id, value) {
-    this.add(id, value);
+  onselect: function(options, value) {
+    this.add(options, value);
     this.close();
   },
 
   /**
    * Adds a record to the selected list
    */
-  add: function(id, label) {
+  add: function(options, label) {
     // return silently if this value has already been selected
     var already_selected = this.list_container.getElementsBySelector('input').any(function(i) {
       return i.value == id

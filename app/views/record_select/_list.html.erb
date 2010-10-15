@@ -17,7 +17,7 @@ page.pager.per_page),
   </li>
   <% end -%>
   <% page.items.each do |record| -%>
-  <li class="record <%= cycle 'odd', 'even' %>" id="rs<%= record.id -%>">
+  <li class="record <%= cycle 'odd', 'even' %>" id="rs<%= record.to_param -%>">
     <%= render_record_in_list(record, controller) %>
   </li>
   <% end -%>

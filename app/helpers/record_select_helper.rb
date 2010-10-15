@@ -5,7 +5,6 @@ module RecordSelectHelper
     includes = ''
     includes << stylesheet_link_tag('record_select/record_select')
     includes << javascript_include_tag('record_select/record_select')
-    includes.html_safe
   end
 
   # Adds a link on the page that toggles a RecordSelect widget from the given controller.
@@ -47,15 +46,21 @@ module RecordSelectHelper
     controller = assert_controller_responds(options[:controller])
 
     id = label = ''
+    attributes = nil
     if current and not current.new_record?
       id = current.id
       label = label_for_field(current, controller)
+      
+      attributes = {}
+      options[:attributes].each do |key|
+        attributes[key] = current.send(key)
+      end
     end
 
     url = url_for({:action => :browse, :controller => options[:controller], :escape => false}.merge(options[:params]))
 
     html = text_field_tag(name, nil, :autocomplete => 'off', :id => options[:id], :class => options[:class], :onfocus => "this.focused=true", :onblur => "this.focused=false")
-    html << javascript_tag("new RecordSelect.Single(#{options[:id].to_json}, #{url.to_json}, {id: #{id.to_json}, label: #{label.to_json}, onchange: #{options[:onchange] || ''.to_json}});")
+    html << javascript_tag("new RecordSelect.Single(#{options[:id].to_json}, #{url.to_json}, {id: #{id.to_json}, label: #{label.to_json}, onchange: #{options[:onchange] || ''.to_json}, attributes: #{attributes.to_json}});")
 
     return html
   end
@@ -133,8 +138,16 @@ module RecordSelectHelper
   def render_record_in_list(record, controller_path)
     text = render_record_from_config(record)
     if record_select_config.link?
-      url_options = {:controller => controller_path, :action => :select, :id => record.id, :escape => false}
-      link_to text, url_options, :method => :post, :remote => true, :class => ''
+      
+      url_params = {:controller => controller_path, :action => :select, :escape => false}
+      url_params.merge!(record.to_record_select)
+      
+      link_to_remote text, {
+          :url => url_params,
+          :method => :post,
+          :before => 'Element.toggleClassName(this, "selected");',
+          :condition => "RecordSelect.notify(this, #{record.to_record_select.to_json})"
+        }, :href => url_for(url_params)
     else
       text
     end
