@@ -76,7 +76,9 @@ Object.extend(RecordSelect.Abstract.prototype, {
         this.show();
         // needs to be mousedown so the event doesn't get canceled by other code (see issue #26)
         Element.observe(document.body, 'mousedown', this.onbodyclick.bindAsEventListener(this));
-      }.bind(this)
+      }.bind(this),
+      // TODO pass in whether to send whole form
+      parameters: this.obj.up('form').serialize(true)
     });
   },
 
@@ -352,12 +354,12 @@ RecordSelect.Multiple.prototype = Object.extend(new RecordSelect.Abstract(), {
     else this.list_container = this.obj.next('ul');
 
     // take the input name from the text input, and store it for this.add()
-    this.input_name = this.obj.name;
+    this.hidden_inputs_base_name = this.obj.name.replace(/\[\]$/, '');
     this.obj.name = '';
 
     // initialize the list
     $A(this.options.current).each(function(c) {
-      this.add(c.id, c.label);
+      this.add({id: c.id}, c.label.unescapeHTML());
     }.bind(this));
 
     this._respond_to_text_field(this.obj);
@@ -375,14 +377,31 @@ RecordSelect.Multiple.prototype = Object.extend(new RecordSelect.Abstract(), {
   add: function(options, label) {
     // return silently if this value has already been selected
     var already_selected = this.list_container.getElementsBySelector('input').any(function(i) {
-      return i.value == id
+      return i.value == options['id']
     });
     if (already_selected) return;
 
+    var escaped_name_prefix = RegExp.escape(this.hidden_inputs_base_name + '[');
+    var name_prefix_reg_exp = new RegExp(escaped_name_prefix);
+    var current_max_index = this.list_container.getElementsBySelector('input').max(function(i) {
+      prefix_stripped = i.name.replace(name_prefix_reg_exp, '');
+      suffix_stripped = prefix_stripped.replace(/\].*/, '');
+      
+      return parseInt(suffix_stripped);
+    });
+    if (typeof(current_max_index) == 'undefined') {
+      current_max_index = -1;
+    }
+    var entry_index = current_max_index + 1;
     var entry = '<li>'
-              + '<a href="#" onclick="$(this.parentNode).remove(); return false;" class="remove">remove</a>'
-              + '<input type="hidden" name="' + this.input_name + '" value="' + id + '" />'
-              + '<label>' + label + '</label>'
+              + '<a href="#" onclick="$(this.parentNode).remove(); return false;" class="remove">remove</a>';
+    $H(options).each(function(pair) {
+      entry += '<input type="hidden" name="' +
+               this.hidden_inputs_base_name + '[' + entry_index  + ']' + '[' + pair.key  + ']' +
+               '" value="' + pair.value + '" />';
+    }, this)
+    
+    entry += '<label>' + label.escapeHTML() + '</label>'
               + '</li>';
     new Insertion.Top(this.list_container, entry);
   }
