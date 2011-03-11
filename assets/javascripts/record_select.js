@@ -73,9 +73,11 @@ Object.extend(RecordSelect.Abstract.prototype, {
       evalScripts: true,
       asynchronous: true,
       onComplete: function() {
+        if (this.focused) {
         this.show();
         // needs to be mousedown so the event doesn't get canceled by other code (see issue #26)
         Element.observe(document.body, 'mousedown', this.onbodyclick.bindAsEventListener(this));
+        }
       }.bind(this),
       // TODO pass in whether to send whole form
       parameters: this.obj.up('form').serialize(true)
@@ -155,7 +157,14 @@ Object.extend(RecordSelect.Abstract.prototype, {
    */
   _respond_to_text_field: function(text_field) {
     // attach the events to start this party
-    text_field.observe('focus', this.open.bind(this));
+    text_field.observe('focus', function() {
+      this.focused = true;
+      this.open();
+    }.bind(this));
+    text_field.observe('blur', function() {
+      this.focused = false;
+      this.close();
+    }.bind(this));
 
     // the autosearch event - needs to happen slightly late (keyup is later than keypress)
     text_field.observe('keyup', function() {
