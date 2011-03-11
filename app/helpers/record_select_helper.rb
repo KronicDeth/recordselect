@@ -105,7 +105,18 @@ module RecordSelectHelper
     url = url_for({:action => :browse, :controller => options[:controller], :escape => false}.merge(options[:params]))
 
     html = text_field_tag("#{name}[]", nil, :autocomplete => 'off', :id => options[:id], :class => options[:class], :onfocus => "this.focused=true", :onblur => "this.focused=false")
-    html << content_tag('ul', '', :class => 'record-select-list');
+    html << content_tag('table', :class => 'record-select-table', :cellpadding => 0, :cellspacing => 0) {
+      content_tag('thead') {
+        content_tag('tr') {
+          content_tag('th') {
+            # <p> needed for ActiveScaffold formatting
+            content_tag('p', 'Selected')
+          } +
+          content_tag('th', '', :class => 'actions')
+        }
+      } +
+      content_tag('tbody', '', :id => "record-select-#{options[:id]}-tbody", :class => 'records')
+    }
     html << javascript_tag("new RecordSelect.Multiple(#{options[:id].to_json}, #{url.to_json}, {current: #{current.to_json}});")
 
     return html

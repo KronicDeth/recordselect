@@ -361,9 +361,9 @@ RecordSelect.Multiple.prototype = Object.extend(new RecordSelect.Abstract(), {
     this.container = this.create_container();
     this.container.addClassName('record-select-autocomplete');
 
-    // decide where the <li> entries should be placed
-    if (this.options.list) this.list_container = $(this.options.list);
-    else this.list_container = this.obj.next('ul');
+    // decide where the <tr> entries should be placed
+    if (this.options.table) this.table_container = $(this.options.table);
+    else this.table_container = this.obj.next('table');
 
     // take the input name from the text input, and store it for this.add()
     this.hidden_inputs_base_name = this.obj.name.replace(/\[\]$/, '');
@@ -388,14 +388,14 @@ RecordSelect.Multiple.prototype = Object.extend(new RecordSelect.Abstract(), {
    */
   add: function(options, label) {
     // return silently if this value has already been selected
-    var already_selected = this.list_container.getElementsBySelector('input').any(function(i) {
+    var already_selected = this.table_container.getElementsBySelector('input').any(function(i) {
       return i.value == options['id']
     });
     if (already_selected) return;
 
     var escaped_name_prefix = RegExp.escape(this.hidden_inputs_base_name + '[');
     var name_prefix_reg_exp = new RegExp(escaped_name_prefix);
-    var current_max_index = this.list_container.getElementsBySelector('input').max(function(i) {
+    var current_max_index = this.table_container.getElementsBySelector('input').max(function(i) {
       prefix_stripped = i.name.replace(name_prefix_reg_exp, '');
       suffix_stripped = prefix_stripped.replace(/\].*/, '');
       
@@ -405,16 +405,24 @@ RecordSelect.Multiple.prototype = Object.extend(new RecordSelect.Abstract(), {
       current_max_index = -1;
     }
     var entry_index = current_max_index + 1;
-    var entry = '<li>'
-              + '<a href="#" onclick="$(this.parentNode).remove(); return false;" class="remove">remove</a>';
+    var entry = '<tr class="record">'
+                + '<td>';
+              
     $H(options).each(function(pair) {
       entry += '<input type="hidden" name="' +
                this.hidden_inputs_base_name + '[' + entry_index  + ']' + '[' + pair.key  + ']' +
                '" value="' + pair.value + '" />';
     }, this)
     
-    entry += '<label>' + label.escapeHTML() + '</label>'
-              + '</li>';
-    new Insertion.Top(this.list_container, entry);
+    var tbody = this.table_container.down('tbody')
+    entry += label.escapeHTML()
+             + '</td>'
+             + '<td class="actions">'
+             + "<a href=\"#\" onclick=\"$(this).up('tr').remove(); ActiveScaffold.stripe('" + tbody.id + "'); return false;\" class=\"remove\">"
+             + 'Delete'
+             + '</a>'
+             + '</td>'
+    new Insertion.Top(tbody, entry);
+    ActiveScaffold.stripe(tbody);
   }
 });
