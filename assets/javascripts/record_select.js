@@ -163,7 +163,6 @@ Object.extend(RecordSelect.Abstract.prototype, {
     }.bind(this));
     text_field.observe('blur', function() {
       this.focused = false;
-      this.close();
     }.bind(this));
 
     // the autosearch event - needs to happen slightly late (keyup is later than keypress)
@@ -220,6 +219,10 @@ Object.extend(RecordSelect.Abstract.prototype, {
       case Event.KEY_ESC:
         this.close();
         break;
+      case Event.KEY_TAB:
+        this.close();
+        /* KEY_TAB differs from KEY_ESC in that KEY_TAB is allowed to propagate
+           to change form fields. */
       default:
         return;
     }
